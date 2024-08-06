@@ -8,6 +8,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 const (
@@ -22,7 +23,10 @@ type formatCacheType struct {
 	longTime, longDate   string
 }
 
-var formatCache = &formatCacheType{}
+var (
+	formatCache = &formatCacheType{}
+	cacheMutex  = &sync.Mutex{}
+)
 
 // Known format codes:
 // %T - Time (15:04:05 MST)
@@ -46,6 +50,10 @@ func FormatLogRecord(format string, rec *LogRecord) string {
 	secs := rec.Created.UnixNano() / 1e9
 
 	cache := *formatCache
+
+	// Lock the mutex before accessing the formatCache
+	cacheMutex.Lock()
+
 	if cache.LastUpdateSeconds != secs {
 		month, day, year := rec.Created.Month(), rec.Created.Day(), rec.Created.Year()
 		hour, minute, second := rec.Created.Hour(), rec.Created.Minute(), rec.Created.Second()
@@ -61,6 +69,9 @@ func FormatLogRecord(format string, rec *LogRecord) string {
 		formatCache = updated
 
 	}
+	// unlock the mutex after the critical
+	cacheMutex.Unlock()
+	
 	//custom format datetime pattern %D{2006-01-02T15:04:05}
 	formatByte := changeDttmFormat(format, rec)
 	// Split the string into pieces by % signs
