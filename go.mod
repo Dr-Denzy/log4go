@@ -1,4 +1,4 @@
-module github.com/Dr-Denzy/log4go
+module github.com/jeanphorn/log4go
 
 go 1.18
 
