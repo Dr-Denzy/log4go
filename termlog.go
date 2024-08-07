@@ -34,15 +34,8 @@ func (c *ConsoleLogWriter) SetFormat(format string) {
 	c.format = format
 }
 func (c *ConsoleLogWriter) run(out io.Writer) {
-
 	for rec := range c.w {
-		// Use a temporary variable to hold the formatted log message
-		formattedRecord := FormatLogRecord(c.format, rec)
-
-		// Lock only for the actual writing to the output
-		c.mu.Lock()
-		fmt.Fprint(out, formattedRecord)
-		c.mu.Unlock()
+		fmt.Fprint(out, FormatLogRecord(c.format, rec))
 	}
 }
 
