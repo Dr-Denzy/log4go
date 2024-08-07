@@ -29,23 +29,27 @@ func NewConsoleLogWriter() *ConsoleLogWriter {
 	return consoleWriter
 }
 func (c *ConsoleLogWriter) SetFormat(format string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.format = format
 }
 func (c *ConsoleLogWriter) run(out io.Writer) {
-	c.mu.Lock()
 
 	for rec := range c.w {
-		fmt.Fprint(out, FormatLogRecord(c.format, rec))
+		// Use a temporary variable to hold the formatted log message
+		formattedRecord := FormatLogRecord(c.format, rec)
+
+		// Lock only for the actual writing to the output
+		c.mu.Lock()
+		fmt.Fprint(out, formattedRecord)
+		c.mu.Unlock()
 	}
-	c.mu.Unlock()
 }
 
 // This is the ConsoleLogWriter's output method.  This will block if the output
 // buffer is full.
 func (c *ConsoleLogWriter) LogWrite(rec *LogRecord) {
-	c.mu.Lock()
 	c.w <- rec
-	c.mu.Unlock()
 }
 
 // Close stops the logger from sending messages to standard output.  Attempts to
