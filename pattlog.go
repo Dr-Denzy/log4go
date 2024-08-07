@@ -41,7 +41,6 @@ func FormatLogRecord(format string, rec *LogRecord) string {
 
 	// Lock the mutex before accessing the formatCache
 	cacheMutex.Lock()
-	defer cacheMutex.Unlock()
 
 	if formatCache.LastUpdateSeconds != secs {
 		month, day, year := rec.Created.Month(), rec.Created.Day(), rec.Created.Year()
@@ -56,6 +55,9 @@ func FormatLogRecord(format string, rec *LogRecord) string {
 
 	// Make a copy of the cache after updating it
 	cache := *formatCache
+
+	// Unlock the mutex after updating the cache
+	cacheMutex.Unlock()
 
 	//custom format datetime pattern %D{2006-01-02T15:04:05}
 	formatByte := changeDttmFormat(format, rec)
