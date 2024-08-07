@@ -28,16 +28,6 @@ var (
 	cacheMutex  = &sync.Mutex{}
 )
 
-// Known format codes:
-// %T - Time (15:04:05 MST)
-// %t - Time (15:04)
-// %D - Date (2006/01/02)
-// %d - Date (01/02/06)
-// %L - Level (FNST, FINE, DEBG, TRAC, WARN, EROR, CRIT)
-// %S - Source
-// %M - Message
-// Ignores unknown formats
-// Recommended: "[%D %T] [%L] (%S) %M"
 func FormatLogRecord(format string, rec *LogRecord) string {
 	if rec == nil {
 		return "<nil>"
@@ -49,29 +39,24 @@ func FormatLogRecord(format string, rec *LogRecord) string {
 	out := bytes.NewBuffer(make([]byte, 0, 64))
 	secs := rec.Created.UnixNano() / 1e9
 
-	cache := *formatCache
-
 	// Lock the mutex before accessing the formatCache
 	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
 
-	if cache.LastUpdateSeconds != secs {
+	if formatCache.LastUpdateSeconds != secs {
 		month, day, year := rec.Created.Month(), rec.Created.Day(), rec.Created.Year()
 		hour, minute, second := rec.Created.Hour(), rec.Created.Minute(), rec.Created.Second()
 		zone, _ := rec.Created.Zone()
-		updated := &formatCacheType{
-			LastUpdateSeconds: secs,
-			shortTime:         fmt.Sprintf("%02d:%02d", hour, minute),
-			shortDate:         fmt.Sprintf("%02d/%02d/%02d", day, month, year%100),
-			longTime:          fmt.Sprintf("%02d:%02d:%02d %s", hour, minute, second, zone),
-			longDate:          fmt.Sprintf("%04d/%02d/%02d", year, month, day),
-		}
-		cache = *updated
-		formatCache = updated
-
+		formatCache.LastUpdateSeconds = secs
+		formatCache.shortTime = fmt.Sprintf("%02d:%02d", hour, minute)
+		formatCache.shortDate = fmt.Sprintf("%02d/%02d/%02d", day, month, year%100)
+		formatCache.longTime = fmt.Sprintf("%02d:%02d:%02d %s", hour, minute, second, zone)
+		formatCache.longDate = fmt.Sprintf("%04d/%02d/%02d", year, month, day)
 	}
-	// unlock the mutex after the critical
-	cacheMutex.Unlock()
-	
+
+	// Make a copy of the cache after updating it
+	cache := *formatCache
+
 	//custom format datetime pattern %D{2006-01-02T15:04:05}
 	formatByte := changeDttmFormat(format, rec)
 	// Split the string into pieces by % signs
@@ -121,7 +106,7 @@ type FormatLogWriter chan *LogRecord
 
 // This creates a new FormatLogWriter
 func NewFormatLogWriter(out io.Writer, format string) FormatLogWriter {
-	records := make(FormatLogWriter, LogBufferLength)
+	records := make(FormatLogWriter, 100)
 	go records.run(out, format)
 	return records
 }
