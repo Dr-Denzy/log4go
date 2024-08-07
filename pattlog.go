@@ -21,11 +21,11 @@ type formatCacheType struct {
 	LastUpdateSeconds    int64
 	shortTime, shortDate string
 	longTime, longDate   string
+	mutex                sync.Mutex
 }
 
 var (
 	formatCache = &formatCacheType{}
-	cacheMutex  = &sync.Mutex{}
 )
 
 func FormatLogRecord(format string, rec *LogRecord) string {
@@ -40,7 +40,8 @@ func FormatLogRecord(format string, rec *LogRecord) string {
 	secs := rec.Created.UnixNano() / 1e9
 
 	// Lock the mutex before accessing the formatCache
-	cacheMutex.Lock()
+	formatCache.mutex.Lock()
+	defer formatCache.mutex.Unlock()
 
 	if formatCache.LastUpdateSeconds != secs {
 		month, day, year := rec.Created.Month(), rec.Created.Day(), rec.Created.Year()
@@ -53,12 +54,6 @@ func FormatLogRecord(format string, rec *LogRecord) string {
 		formatCache.longDate = fmt.Sprintf("%04d/%02d/%02d", year, month, day)
 	}
 
-	// Make a copy of the cache after updating it
-	cache := *formatCache
-
-	// Unlock the mutex after updating the cache
-	cacheMutex.Unlock()
-
 	//custom format datetime pattern %D{2006-01-02T15:04:05}
 	formatByte := changeDttmFormat(format, rec)
 	// Split the string into pieces by % signs
@@ -69,13 +64,13 @@ func FormatLogRecord(format string, rec *LogRecord) string {
 		if i > 0 && len(piece) > 0 {
 			switch piece[0] {
 			case 'T':
-				out.WriteString(cache.longTime)
+				out.WriteString(formatCache.longTime)
 			case 't':
-				out.WriteString(cache.shortTime)
+				out.WriteString(formatCache.shortTime)
 			case 'D':
-				out.WriteString(cache.longDate)
+				out.WriteString(formatCache.longDate)
 			case 'd':
-				out.WriteString(cache.shortDate)
+				out.WriteString(formatCache.shortDate)
 			case 'L':
 				out.WriteString(levelStrings[rec.Level])
 			case 'S':

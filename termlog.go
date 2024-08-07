@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -15,6 +16,7 @@ var stdout io.Writer = os.Stdout
 type ConsoleLogWriter struct {
 	format string
 	w      chan *LogRecord
+	mu     sync.Mutex
 }
 
 // This creates a new ConsoleLogWriter
@@ -30,15 +32,20 @@ func (c *ConsoleLogWriter) SetFormat(format string) {
 	c.format = format
 }
 func (c *ConsoleLogWriter) run(out io.Writer) {
+	c.mu.Lock()
+
 	for rec := range c.w {
 		fmt.Fprint(out, FormatLogRecord(c.format, rec))
 	}
+	c.mu.Unlock()
 }
 
 // This is the ConsoleLogWriter's output method.  This will block if the output
 // buffer is full.
 func (c *ConsoleLogWriter) LogWrite(rec *LogRecord) {
+	c.mu.Lock()
 	c.w <- rec
+	c.mu.Unlock()
 }
 
 // Close stops the logger from sending messages to standard output.  Attempts to
